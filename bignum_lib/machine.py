@@ -26,7 +26,7 @@ class Machine(object):
     CSR_MOD_BASE = 0x7D0
     CSR_RNG = 0xFC0
     WSR_MOD = 0x0
-    WSR_RND = 0x1
+    WSR_RND = 1
 
     # breakpoints is dictionary with break addresses being keys and
     # values are tuples of number of passes required and the pass counter
@@ -159,7 +159,7 @@ class Machine(object):
         self.dmp = 0
         self.rfp = 0
         self.lc = 0
-        self.rnd = 1
+        self.rnd = 0x9999999999999999999999999999999999999999999999999999999999999999
         self.pc = 0
         self.acc = 0
         self.mod = 0
