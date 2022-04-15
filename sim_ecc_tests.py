@@ -19,12 +19,14 @@ from Crypto.Signature import DSS
 import sys
 
 # Switch to True to get a full instruction trace
-ENABLE_TRACE_DUMP = False
+ENABLE_TRACE_DUMP = True
 
 # Configuration for the statistics prints
 STATS_CONFIG = {
     'instruction_histo_sort_by': 'key',
 }
+
+DMEM_BYTE_ADDRESSING=True
 
 BN_WORD_LEN = 256
 BN_LIMB_LEN = 32
@@ -34,9 +36,11 @@ BN_LIMB_MASK = 2**BN_LIMB_LEN-1
 DMEM_DEPTH = 1024
 PROGRAM_HEX_FILE = 'hex/dcrypto_p256.hex'
 PROGRAM_ASM_FILE = 'asm/dcrypto_p256.asm_anno'
-PROGRAM_OTBN_ASM_FILE = 'asm/dcrypto_p256.otbn_asm'
+PROGRAM_OTBN_ASM_FILE = 'asm/p256.s'
+#PROGRAM_OTBN_ASM_FILE = 'asm/dcrypto_p256.otbn_asm'
 
 # pointers to dmem areas according to calling conventions of the p256 lib
+dmem_mult = 32 if DMEM_BYTE_ADDRESSING else 1
 pLoc = 0  # Location of pointer in dmem
 pK = 1
 pRnd = 2
@@ -149,14 +153,14 @@ def init_dmem():
 
 def load_pointer():
     """Load pointers into 1st dmem word according to calling conventions"""
-    pval = pK
-    pval += (pRnd << BN_LIMB_LEN*1)
-    pval += (pMsg << BN_LIMB_LEN*2)
-    pval += (pR << BN_LIMB_LEN*3)
-    pval += (pS << BN_LIMB_LEN*4)
-    pval += (pX << BN_LIMB_LEN*5)
-    pval += (pY << BN_LIMB_LEN*6)
-    pval += (pD << BN_LIMB_LEN*7)
+    pval = pK*dmem_mult
+    pval += (pRnd*dmem_mult << BN_LIMB_LEN*1)
+    pval += (pMsg*dmem_mult << BN_LIMB_LEN*2)
+    pval += (pR*dmem_mult << BN_LIMB_LEN*3)
+    pval += (pS*dmem_mult << BN_LIMB_LEN*4)
+    pval += (pX*dmem_mult << BN_LIMB_LEN*5)
+    pval += (pY*dmem_mult << BN_LIMB_LEN*6)
+    pval += (pD*dmem_mult << BN_LIMB_LEN*7)
     dmem[pLoc] = pval
 
 
@@ -198,6 +202,9 @@ def load_y(y):
 def load_d(d):
     """Load the private key in dmem at appropriate location according to calling conventions"""
     dmem[pD] = d
+
+def load_mod1():
+    dmem[16] = 0x0000_0000
 
 
 # Program loading
@@ -255,7 +262,7 @@ def load_program_otbn_asm():
     global breakpoints
 
     insfile = open(PROGRAM_OTBN_ASM_FILE)
-    ins_objects, ctx, breakpoints = ins_objects_from_asm_file(insfile)
+    ins_objects, ctx, breakpoints = ins_objects_from_asm_file(insfile, dmem_byte_addressing=DMEM_BYTE_ADDRESSING)
     insfile.close()
 
     # reverse label address dictionary for function addresses (OTBN asm does not differantiate between generic
@@ -523,7 +530,7 @@ def run_test(name):
     test_results['cycle_cnt'] = cycle_cnt
     test_results['stats'] = stats
 
-    dump_stats(stats, STATS_CONFIG)
+    #dump_stats(stats, STATS_CONFIG)
     print("Total: %d instructions, taking %d cycles." % (inst_cnt, cycle_cnt))
 
     return test_results
@@ -545,41 +552,41 @@ def main():
     cycle_cnt = 0
 
     # select program source
-    load_program_hex()
+    #load_program_hex()
     #load_program_asm()
-    #load_program_otbn_asm()
+    load_program_otbn_asm()
 
     # curve point test (deterministic)
     print_test_headline(1, 8, "curve point test (deterministic)")
     run_test("curvepoint_deterministic")
 
     # curve point test (random)
-    print_test_headline(2, 8, "curve point test (random)")
-    run_test("curvepoint_random")
+    #print_test_headline(2, 8, "curve point test (random)")
+    #run_test("curvepoint_random")
 
     # scalar multiplication (deterministic)
-    print_test_headline(3, 8, "scalar multiplication (deterministic)")
-    run_test("scalarmul_deterministic")
+    #print_test_headline(3, 8, "scalar multiplication (deterministic)")
+    #run_test("scalarmul_deterministic")
 
     # scalar multiplication (random)
-    print_test_headline(4, 5, "scalar multiplication (random)")
-    run_test("scalarmul_random")
+    #print_test_headline(4, 5, "scalar multiplication (random)")
+    #run_test("scalarmul_random")
 
     # ECDSA sign (deterministic)
-    print_test_headline(5, 8, "ECDSA sign (deterministic)")
-    run_test("ecdsa_sign_deterministic")
+    #print_test_headline(5, 8, "ECDSA sign (deterministic)")
+    #run_test("ecdsa_sign_deterministic")
 
     # ECDSA sign (random (random key, random k, deterministic message digest))
-    print_test_headline(6, 8, "ECDSA sign (random (random key, random k, deterministic message digest))")
-    run_test("ecdsa_sign_random")
+    #print_test_headline(6, 8, "ECDSA sign (random (random key, random k, deterministic message digest))")
+    #run_test("ecdsa_sign_random")
 
     # ECDSA verify (deterministic)
     print_test_headline(7, 8, "ECDSA verify (deterministic)")
     run_test("ecdsa_verify_deterministic")
 
     # ECDSA verify (random)
-    print_test_headline(8, 8, "ECDSA verify (random)")
-    run_test("ecdsa_verify_random")
+    #print_test_headline(8, 8, "ECDSA verify (random)")
+    #run_test("ecdsa_verify_random")
 
 
 if __name__ == "__main__":
