@@ -115,6 +115,7 @@ class Assembler:
                 if tokens[0] == 'break':
                     self.breakpoints.append(len(self.instr))
 
+
             # comments
             elif tokens[0].strip().startswith('*') or tokens[0].strip().startswith('/'):
                 pass

@@ -2264,12 +2264,12 @@ class IBranch(GIMidImm):
             return [ins_read_csr, ins_andi, ins_branch]
         if self.MNEM.get(self.funb) == 'bl':
             ins_read_csr = IOtCsrrs(2, Machine.CSR_FLAG, 0, self.ctx)
-            ins_andi = IOtAndi(2, 2, 2, self.ctx)
+            ins_andi = IOtAndi(2, 2, 4, self.ctx)
             ins_branch = IOtBne(2, 0, offset, addr, self.ctx, self.label)
             return [ins_read_csr, ins_andi, ins_branch]
         if self.MNEM.get(self.funb) == 'bm':
             ins_read_csr = IOtCsrrs(2, Machine.CSR_FLAG, 0, self.ctx)
-            ins_andi = IOtAndi(2, 2, 4, self.ctx)
+            ins_andi = IOtAndi(2, 2, 3, self.ctx)
             ins_branch = IOtBne(2, 0, offset, addr, self.ctx, self.label)
             return [ins_read_csr, ins_andi, ins_branch]
         if self.MNEM.get(self.funb) == 'bz':
@@ -2284,12 +2284,12 @@ class IBranch(GIMidImm):
             return [ins_read_csr, ins_andi, ins_branch]
         if self.MNEM.get(self.funb) == 'bnl':
             ins_read_csr = IOtCsrrs(2, Machine.CSR_FLAG, 0, self.ctx)
-            ins_andi = IOtAndi(2, 2, 2, self.ctx)
+            ins_andi = IOtAndi(2, 2, 4, self.ctx)
             ins_branch = IOtBeq(2, 0, offset, addr, self.ctx, self.label)
             return [ins_read_csr, ins_andi, ins_branch]
         if self.MNEM.get(self.funb) == 'bnm':
             ins_read_csr = IOtCsrrs(2, Machine.CSR_FLAG, 0, self.ctx)
-            ins_andi = IOtAndi(2, 2, 4, self.ctx)
+            ins_andi = IOtAndi(2, 2, 3, self.ctx)
             ins_branch = IOtBeq(2, 0, offset, addr, self.ctx, self.label)
             return [ins_read_csr, ins_andi, ins_branch]
         if self.MNEM.get(self.funb) == 'bnz':
