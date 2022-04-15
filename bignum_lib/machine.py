@@ -119,7 +119,7 @@ class Machine(object):
 
         if breakpoints:
             for item in breakpoints:
-                self.toggle_breakpoint(item)
+                self.set_breakpoint(item)
 
         self.stats = {}
 
@@ -218,7 +218,7 @@ class Machine(object):
     def __check_imem_addr(self, addr):
         """Check if Imem address is within bounds"""
         if addr < 0 or addr >= len(self.imem):
-            raise IndexError
+            raise IndexError('Address ' + str(addr) + ' out of range (0 to ' + str(len(self.imem)) + ')')
 
     def __get_limb_from_reg_val(self, lidx, regval):
         """Extract a specific limb from a register"""
@@ -415,7 +415,7 @@ class Machine(object):
             return self.get_reg('mod')
         if wsr == self.WSR_RND:
             return self.get_reg('rnd')
-        raise Exception('Invalid WSR')
+        raise Exception('Invalid WSR: ' + str(wsr))
 
     def set_wsr(self, wsr, val):
         """Set a WSR"""
@@ -463,12 +463,14 @@ class Machine(object):
     def get_dmem(self, address):
         """Get value for a dmem address"""
         self.__check_dmem_addr(address)
+        #print('pc: ' + str(self.get_pc()) + '; get cell: ' + str(address))
         if not self.init_dmem[address]:
             print('Warning: reading from uninitialized dmem memory address: ' + hex(address))
         return self.dmem[address]
 
     def get_dmem_otbn(self, address):
         """Get value for a dmem address in otbn format"""
+        #print('pc: ' + str(self.get_pc()) + '; get byte: ' + str(address))
         dmem_addr = address//32
         limb = (address%32)//4
         self.__check_dmem_addr(dmem_addr)
@@ -477,8 +479,19 @@ class Machine(object):
     def set_dmem(self, address, value):
         """Set value at a dmem address"""
         self.__check_dmem_addr(address)
+        #print('pc: ' + str(self.get_pc()) + '; set cell: ' + str(address))
         self.__check_reg_val(value)
         self.dmem[address] = value
+        self.init_dmem[address] = True
+
+    def set_dmem_otbn(self, address, value):
+        """Set value at a dmem address"""
+        #print('pc: ' + str(self.get_pc()) + '; set byte: ' + str(address))
+        dmem_addr = address//32
+        limb = (address%32)//4
+        self.__check_dmem_addr(dmem_addr)
+        self.__check_reg_val(value)
+        self.dmem[dmem_addr] = self.__mod_limb_in_reg_val(limb, self.dmem[dmem_addr], value)
         self.init_dmem[address] = True
 
     def push_loop_stack(self, cnt, end_addr, start_addr):
@@ -617,6 +630,24 @@ class Machine(object):
         self.set_flag('XM', self.__test_bit(val, self.XLEN - 1))
         self.set_flag('XL', self.__test_bit(val, 0))
 
+    def set_c_m(self, val):
+        """Set/Unset C and M flags by examining the given value"""
+        self.set_flag('C', self.__test_bit(val, self.XLEN))
+        self.set_flag('M', self.__test_bit(val, self.XLEN - 1))
+
+    def setx_c_m(self, val):
+        """Set/Unset C and M flags by examining the given value"""
+        self.set_flag('XC', self.__test_bit(val, self.XLEN))
+        self.set_flag('XM', self.__test_bit(val, self.XLEN - 1))
+
+    def set_l(self, val):
+        """Set/Unset L flag by examining the given value"""
+        self.set_flag('L', self.__test_bit(val, 0))
+
+    def setx_l(self, val):
+        """Set/Unset XL flag by examining the given value"""
+        self.set_flag('XL', self.__test_bit(val, 0))
+
     def get_instruction(self, address):
         """Get instruction binary at an imem address"""
         self.__check_imem_addr(address)
@@ -649,6 +680,19 @@ class Machine(object):
         if header:
             res_str += self.get_limb_header()
         for i in range(0, self.NUM_REGS):
+            if (i % 4) == 0:
+                res_str += '\n'
+            res_str += ('r' + str(i)).rjust(3) + ': ' + self.get_xlen_hex_str(self.get_reg(i))
+            if i != self.NUM_REGS:
+                res_str += '\n'
+        return res_str
+
+    def get_reg_table_debug(self, header):
+        """Get a table with hex strings of all regs"""
+        res_str = ''
+        if header:
+            res_str += self.get_limb_header()
+        for i in range(1, self.NUM_REGS-1):
             if (i % 4) == 0:
                 res_str += '\n'
             res_str += ('r' + str(i)).rjust(3) + ': ' + self.get_xlen_hex_str(self.get_reg(i))
@@ -748,6 +792,38 @@ class Machine(object):
                     print('\nBreakpoint set at address ' + str(addr) + '\n')
             else:
                 print('\nError: breakpoint address out of range\n')
+
+    def set_breakpoint(self, bp, passes=1, msg=False):
+        # breakpoints is a dictionary with the address as key and the values
+        # are tuples of number of passes required to break and the pass counter
+        if isinstance(bp, int):
+            addr = int(bp)
+        else:
+            if bp.isdigit():
+                addr = int(bp)
+            elif bp.lower().startswith('0x'):
+                addr = int(bp[2:], 16)
+            else:
+                if not self.ctx:
+                    print('\nError: Label/function breakpoints only possible when assembly context is available\n')
+                    return
+                else:
+                    rev_functions = {v: k for k, v in self.ctx.functions.items()}
+                    rev_labels = {v: k for k, v in self.ctx.labels.items()}
+                    if bp in rev_functions:
+                        addr = rev_functions[bp]
+                    elif bp in rev_labels:
+                        addr = rev_labels[bp]
+                    else:
+                        print('\nError: function or label \'' + bp + '\' not found.\n')
+                        return
+        """set a breakpoint"""
+        if addr in range(0, self.IMEM_DEPTH):
+            self.breakpoints.update({addr: (passes, 1)})
+            if msg:
+                print('\nBreakpoint set at address ' + str(addr) + '\n')
+        else:
+            print('\nError: breakpoint address out of range\n')
 
     def __check_break(self):
         """check if current PC is in list of Breakpoints, if so and the number of required passes are reached, break,
@@ -987,6 +1063,8 @@ class Machine(object):
         cycles = instr.get_cycles()
         self.stat_record_instr(instr)
         trace_str, jump_addr = instr.execute(self)
+        #print(self.get_pc())
+        #print(self.get_reg_table_debug(False))
         if len(self.loop_stack) and (self.get_pc() == self.get_top_loop_end_addr()):
             if self.dec_top_loop_cnt():
                 jump_addr = self.get_top_loop_start_addr()
