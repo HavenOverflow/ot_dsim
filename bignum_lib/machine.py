@@ -447,11 +447,12 @@ class Machine(object):
         """Get current accumulator value"""
         self.acc = acc
 
-    def set_pc(self, pc):
+    def set_pc(self, pc, clearfinish = False):
         """Set the program counter"""
         self.__check_imem_addr(pc)
         self.pc = pc
-        self.finishFlag = False
+        if clearfinish:
+            self.finishFlag = False
 
     def get_pc(self):
         """Get the program counter"""
