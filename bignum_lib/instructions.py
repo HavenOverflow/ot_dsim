@@ -295,13 +295,14 @@ class InvalidOp2(ValueError):
 
 
 class InsContext(object):
-    instructions = {}
-    functions = {}
-    labels = {}
-    loopranges = []
-    functioncnt = 0
-    labelcnt = 0
-    dmem_byte_addressing = False
+    def __init__(self):
+        self.instructions = {}
+        self.functions = {}
+        self.labels = {}
+        self.loopranges = []
+        self.functioncnt = 0
+        self.labelcnt = 0
+        self.dmem_byte_addressing = False
 
     def get_or_add_function(self, addr):
         if addr not in self.functions:
@@ -336,7 +337,6 @@ class AsmCtx:
         self.labels = labels
 
         self.ins_ctx = InsContext()
-        self.ins_ctx.functions.clear()
         for k in functions:
             if isinstance(functions[k], tuple):
                 self.ins_ctx.functions.update({functions[k][0]: k})

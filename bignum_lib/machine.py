@@ -28,18 +28,12 @@ class Machine(object):
     WSR_MOD = 0x0
     WSR_RND = 1
 
-    # breakpoints is dictionary with break addresses being keys and
-    # values are tuples of number of passes required and the pass counter
-    breakpoints = {}
-
-    # force break in later instruction, e.g. when single stepping
-    # Can consider the loop or callstack to allow finishing calls, loops, or step over
-    # Format (Forcebreak active, consider call stack, call stack, consider loop stack, loop stack)
-    force_break = (False, False, 0, False, 0)
+    @staticmethod
+    def _noop(*_args, **_kwargs):
+        return
 
     def get_func_addr_for_pc(self, pc):
         """ Get the function base address for an arbitrary program counter address """
-        func_addr_found = False
         for pc in range(pc, 0, -1):
             if pc in self.ctx.functions:
                 break
@@ -95,7 +89,8 @@ class Machine(object):
             'op': op,
         })
 
-    def __init__(self, dmem, imem, s_addr=0, stop_addr=None, ctx=None, breakpoints=None):
+    def __init__(self, dmem, imem, s_addr=0, stop_addr=None, ctx=None,
+                 breakpoints=None, collect_stats=False, enable_debug=False):
         self.finishFlag = False
         if self.XLEN % (self.LIMBS * 2):
             raise Exception('XLEN must be divisible by LIMBS*2')
@@ -115,13 +110,24 @@ class Machine(object):
         self.dmem_idx_mask = 2 ** self.dmem_idx_width - 1
         self.gpr_mask = 2**self.GPR_WIDTH - 1
         self.ctx = ctx
+        self.enable_debug = bool(enable_debug)
+        self.breakpoints = {}
+        self.force_break = (False, False, 0, False, 0)
         self.reset(dmem, imem, s_addr, stop_addr, clear_regs=True)
 
-        if breakpoints:
+        if self.enable_debug and breakpoints:
             for item in breakpoints:
                 self.set_breakpoint(item)
 
+        self.collect_stats = bool(collect_stats)
         self.stats = {}
+        if not self.collect_stats:
+            self.stat_record_instr = self._noop
+            self.stat_record_func_call = self._noop
+            self.stat_record_loop = self._noop
+            self.stat_record_movi = self._noop
+            self.stat_record_wide_mem_op = self._noop
+            self.stat_record_flag_access = self._noop
 
     def reset(self, dmem, imem, s_addr=0, stop_addr=None, clear_regs=False):
         self.M = False
@@ -1057,9 +1063,10 @@ class Machine(object):
             halt = True
             # print('\nECALL hit or reached \'ret\' instruction with empty call stack. Finishing here.\n')
 
-        is_break, passes = self.__check_break()
-        if is_break:
-            self.__handle_break_command(passes)
+        if self.enable_debug:
+            is_break, passes = self.__check_break()
+            if is_break:
+                self.__handle_break_command(passes)
 
         instr = self.get_instruction(self.get_pc())
         cycles = instr.get_cycles()
@@ -1090,6 +1097,35 @@ class Machine(object):
             return False, trace_str, cycles
         else:
             return cont, trace_str, cycles
+
+    def step_continue(self):
+        halt = self.get_pc() == self.stop_addr or self.finishFlag
+
+        instr = self.get_instruction(self.get_pc())
+        _, jump_addr = instr.execute(self)
+
+        if len(self.loop_stack) and (self.get_pc() == self.get_top_loop_end_addr()):
+            if self.dec_top_loop_cnt():
+                jump_addr = self.get_top_loop_start_addr()
+            else:
+                self.pop_loop_stack()
+
+        if jump_addr is not None:
+            if jump_addr < 0 or jump_addr >= len(self.imem):
+                raise Exception('Invalid jump address')
+            self.set_pc(jump_addr)
+            cont = True
+        else:
+            if (self.get_pc() + 1) >= len(self.imem):
+                cont = False
+            else:
+                cont = True
+                self.inc_pc()
+
+        if halt:
+            return False
+
+        return cont
 
 
 if __name__ == "__main__":
