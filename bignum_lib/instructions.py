@@ -1656,9 +1656,9 @@ class ILdi(GIWideImm):
 
     def dec(self):
         super().dec()
-        self.idx = self.get_gen_bit_slice(self.imm, self.IDX_POS, self.IDX_LEN)
-        if self.imm >> 14 != 0b01:
-            self.malformed = True  # address must include dmem offset at 0x4000
+        self.idx = (self.imm >> self.IDX_POS) & 0xFF
+        if (self.imm >> 13) != 0b01:
+            self.malformed = True  # address must include dmem offset at 0x2000
 
     def get_asm_str(self):
         asm_str = self.MNEM + ' r' + str(self.rd) + ', [#' + str(self.idx) + ']'
@@ -1673,7 +1673,7 @@ class ILdi(GIWideImm):
     @classmethod
     def enc_idx(cls, idx):
         imm = 0
-        imm += 0b01 << 14
+        imm += 0b01 << 13  # fw base marker at 0x2000
         imm += idx << 5
         return cls.enc_imm(imm)
 
@@ -1718,9 +1718,9 @@ class ISti(GIWideImm):
 
     def dec(self):
         super().dec()
-        self.idx = self.get_gen_bit_slice(self.imm, self.IDX_POS, self.IDX_LEN)
-        if self.imm >> 14 != 0b01:
-            self.malformed = True  # address must include dmem offset at 0x4000
+        self.idx = (self.imm >> self.IDX_POS) & 0xFF
+        if (self.imm >> 13) != 0b01:
+            self.malformed = True  # address must include dmem offset at 0x2000
 
     def get_asm_str(self):
         asm_str = self.MNEM + ' r' + str(self.rd) + ', [#' + str(self.idx) + ']'
@@ -1735,7 +1735,7 @@ class ISti(GIWideImm):
     @classmethod
     def enc_idx(cls, idx):
         imm = 0
-        imm += 0b01 << 14
+        imm += 0b01 << 13  # fw base marker at 0x2000
         imm += idx << 5
         return cls.enc_imm(imm)
 
